@@ -1,0 +1,10 @@
+{
+  "name": "social-feed-api",
+  "version": "1.0.0",
+  "description": "Social media feed aggregator API",
+  "main": "api/feed.js",
+  "keywords": ["api", "social-media", "youtube", "instagram"],
+  "author": "",
+  "license": "MIT"
+}
+
