@@ -36,6 +36,7 @@ module.exports = async function handler(req, res) {
       const youtubePosts = await fetchYouTubePosts();
       allPosts = allPosts.concat(youtubePosts);
     }
+    console.log('Using Instagram ID:', INSTAGRAM_USER_ID);
 
     // Fetch Instagram posts
     if (!platform || platform === 'instagram') {
@@ -134,7 +135,7 @@ async function fetchInstagramPosts() {
   }
 
   try {
-    const url = `https://graph.instagram.com/${INSTAGRAM_USER_ID}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count&access_token=${INSTAGRAM_ACCESS_TOKEN}&limit=10`;
+    const url = `https://graph.instagram.com/${INSTAGRAM_USER_ID}/media?fields=id,caption,media_type,media_url,permalink,timestamp&access_token=${INSTAGRAM_ACCESS_TOKEN}&limit=10`;
     
     const response = await fetch(url);
     const data = await response.json();
@@ -149,14 +150,14 @@ async function fetchInstagramPosts() {
       platform: 'instagram',
       title: item.caption ? item.caption.substring(0, 100) + (item.caption.length > 100 ? '...' : '') : 'Instagram Post',
       description: item.caption || '',
-      thumbnail: item.media_type === 'VIDEO' ? item.thumbnail_url : item.media_url,
+      thumbnail: item.media_url,
       url: item.permalink,
       timestamp: item.timestamp,
       mediaType: item.media_type,
-      metrics: {
-        likes: item.like_count || 0,
-        comments: item.comments_count || 0
-      }
+      // metrics: {
+      //   likes: item.like_count || 0,
+      //   comments: item.comments_count || 0
+      // }
     }));
   } catch (error) {
     console.error('Instagram API error:', error);
