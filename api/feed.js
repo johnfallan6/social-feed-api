@@ -135,6 +135,7 @@ async function fetchInstagramPosts() {
   }
 
   try {
+    console.log('INSTAGRAM_USER_ID at runtime =', INSTAGRAM_USER_ID);
     const url = `https://graph.instagram.com/${INSTAGRAM_USER_ID}/media?fields=id,caption,media_type,media_url,permalink,timestamp&access_token=${INSTAGRAM_ACCESS_TOKEN}&limit=10`;
     
     const response = await fetch(url);
