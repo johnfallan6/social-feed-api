@@ -17,6 +17,11 @@ module.exports = async function handler(req, res) {
     return res.status(200).end();
   }
 
+  const INSTAGRAM_USER_ID = process.env.INSTAGRAM_USER_ID;
+  const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
+  const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+  const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
+
   // Check cache
   const now = Date.now();
   if (cache.data && (now - cache.timestamp) < CACHE_DURATION) {
@@ -33,14 +38,13 @@ module.exports = async function handler(req, res) {
 
     // Fetch YouTube posts
     if (!platform || platform === 'youtube') {
-      const youtubePosts = await fetchYouTubePosts();
+      const youtubePosts = await fetchYouTubePosts(YOUTUBE_API_KEY, YOUTUBE_CHANNEL_ID);
       allPosts = allPosts.concat(youtubePosts);
     }
-    console.log('Using Instagram ID:', INSTAGRAM_USER_ID);
 
     // Fetch Instagram posts
     if (!platform || platform === 'instagram') {
-      const instagramPosts = await fetchInstagramPosts();
+      const instagramPosts = await fetchInstagramPosts(INSTAGRAM_USER_ID, INSTAGRAM_ACCESS_TOKEN);
       allPosts = allPosts.concat(instagramPosts);
     }
 
@@ -68,15 +72,9 @@ module.exports = async function handler(req, res) {
       message: error.message 
     });
   }
-}
+};
 
-async function fetchYouTubePosts() {
-  const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
-  const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
-
-  console.log('YouTube API Key length:', YOUTUBE_API_KEY?.length);
-  console.log('YouTube Channel ID:', YOUTUBE_CHANNEL_ID);
-
+async function fetchYouTubePosts(YOUTUBE_API_KEY, YOUTUBE_CHANNEL_ID) {
   if (!YOUTUBE_API_KEY || !YOUTUBE_CHANNEL_ID) {
     console.warn('YouTube credentials not configured');
     return [];
@@ -84,17 +82,13 @@ async function fetchYouTubePosts() {
 
   try {
     const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${YOUTUBE_CHANNEL_ID}&part=snippet&order=date&maxResults=10&type=video`;
-    
     const response = await fetch(url);
     const data = await response.json();
 
-    if (!data.items) {
-      return [];
-    }
+    if (!data.items) return [];
 
     const videoIds = data.items.map(item => item.id.videoId).join(',');
     const statsUrl = `https://www.googleapis.com/youtube/v3/videos?key=${YOUTUBE_API_KEY}&id=${videoIds}&part=statistics`;
-    
     const statsResponse = await fetch(statsUrl);
     const statsData = await statsResponse.json();
 
@@ -125,19 +119,15 @@ async function fetchYouTubePosts() {
   }
 }
 
-async function fetchInstagramPosts() {
-  const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
-  const INSTAGRAM_USER_ID = process.env.INSTAGRAM_USER_ID;
-
-  if (!INSTAGRAM_ACCESS_TOKEN || !INSTAGRAM_USER_ID) {
+async function fetchInstagramPosts(INSTAGRAM_USER_ID, INSTAGRAM_ACCESS_TOKEN) {
+  if (!INSTAGRAM_USER_ID || !INSTAGRAM_ACCESS_TOKEN) {
     console.warn('Instagram credentials not configured');
     return [];
   }
 
   try {
-    console.log('INSTAGRAM_USER_ID at runtime =', INSTAGRAM_USER_ID);
+    console.log('Using Instagram ID:', INSTAGRAM_USER_ID);
     const url = `https://graph.instagram.com/${INSTAGRAM_USER_ID}/media?fields=id,caption,media_type,media_url,permalink,timestamp&access_token=${INSTAGRAM_ACCESS_TOKEN}&limit=10`;
-    
     const response = await fetch(url);
     const data = await response.json();
 
@@ -149,16 +139,12 @@ async function fetchInstagramPosts() {
     return data.data.map(item => ({
       id: `instagram_${item.id}`,
       platform: 'instagram',
-      title: item.caption ? item.caption.substring(0, 100) + (item.caption.length > 100 ? '...' : '') : 'Instagram Post',
+      title: item.caption ? (item.caption.substring(0, 100) + (item.caption.length > 100 ? '...' : '')) : 'Instagram Post',
       description: item.caption || '',
       thumbnail: item.media_url,
       url: item.permalink,
       timestamp: item.timestamp,
-      mediaType: item.media_type,
-      // metrics: {
-      //   likes: item.like_count || 0,
-      //   comments: item.comments_count || 0
-      // }
+      mediaType: item.media_type
     }));
   } catch (error) {
     console.error('Instagram API error:', error);
