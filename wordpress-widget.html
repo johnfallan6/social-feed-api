@@ -3,11 +3,10 @@
 
 <div id="social-feed-container">
   <div class="feed-header">
-    <h2>Latest Updates</h2>
+    <h2>Latest Stories</h2>
     <div class="feed-filters">
       <button class="filter-btn active" data-platform="all">All</button>
       <button class="filter-btn" data-platform="youtube">YouTube</button>
-      <button class="filter-btn" data-platform="instagram">Instagram</button>
     </div>
   </div>
   
@@ -21,6 +20,10 @@
   </div>
   
   <div id="social-feed-posts"></div>
+  
+  <div id="load-more-container" style="text-align: center; margin-top: 30px; display: none;">
+    <button id="load-more-btn" class="load-more-btn">Load More</button>
+  </div>
 </div>
 
 <style>
@@ -72,6 +75,23 @@
   background: #333;
   color: white;
   border-color: #333;
+}
+
+.load-more-btn {
+  padding: 12px 30px;
+  background: #333;
+  color: white;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.load-more-btn:hover {
+  background: #555;
+  transform: translateY(-2px);
 }
 
 #social-feed-loading {
@@ -152,11 +172,6 @@
 
 .post-platform.youtube {
   background: #ff0000;
-  color: white;
-}
-
-.post-platform.instagram {
-  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
   color: white;
 }
 
@@ -254,13 +269,13 @@
 
 <script>
 (function() {
-  // IMPORTANT: Replace this with your actual Vercel API URL
-  const API_URL = 'https://your-project.vercel.app/api/feed';
+  const API_URL = 'https://social-feed-api.vercel.app/api/feed';
+  const INITIAL_POSTS = 6;
   
   let allPosts = [];
   let currentFilter = 'all';
+  let displayCount = INITIAL_POSTS;
   
-  // Initialize feed
   async function initFeed() {
     try {
       showLoading();
@@ -273,8 +288,9 @@
       const data = await response.json();
       allPosts = data.posts;
       
-      renderPosts(allPosts);
+      renderPosts(getFilteredPosts());
       hideLoading();
+      updateLoadMoreButton();
       
       if (data.cached) {
         showCacheInfo(data.cacheAge);
@@ -284,6 +300,14 @@
       console.error('Error loading feed:', error);
       showError();
     }
+  }
+  
+  function getFilteredPosts() {
+    const filtered = currentFilter === 'all' 
+      ? allPosts 
+      : allPosts.filter(post => post.platform === currentFilter);
+    
+    return filtered.slice(0, displayCount);
   }
   
   function renderPosts(posts) {
@@ -314,17 +338,6 @@
         </div>
         <div class="metric">
           <span class="metric-icon">👍</span>
-          <span>${formatNumber(post.metrics.likes)}</span>
-        </div>
-        <div class="metric">
-          <span class="metric-icon">💬</span>
-          <span>${formatNumber(post.metrics.comments)}</span>
-        </div>
-      `;
-    } else if (post.platform === 'instagram') {
-      metricsHTML = `
-        <div class="metric">
-          <span class="metric-icon">❤️</span>
           <span>${formatNumber(post.metrics.likes)}</span>
         </div>
         <div class="metric">
@@ -393,28 +406,49 @@
     container.appendChild(info);
   }
   
+  function updateLoadMoreButton() {
+    const filtered = currentFilter === 'all' 
+      ? allPosts 
+      : allPosts.filter(post => post.platform === currentFilter);
+    
+    const loadMoreContainer = document.getElementById('load-more-container');
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    
+    if (filtered.length > displayCount) {
+      loadMoreContainer.style.display = 'block';
+      const remaining = filtered.length - displayCount;
+      loadMoreBtn.textContent = `Load More (${remaining} remaining)`;
+    } else {
+      loadMoreContainer.style.display = 'none';
+    }
+  }
+  
+  function loadMore() {
+    displayCount += INITIAL_POSTS;
+    renderPosts(getFilteredPosts());
+    updateLoadMoreButton();
+  }
+  
   function filterPosts(platform) {
     currentFilter = platform;
+    displayCount = INITIAL_POSTS;
     
-    // Update button states
     document.querySelectorAll('.filter-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.platform === platform);
     });
     
-    // Filter and render posts
-    const filtered = platform === 'all' 
-      ? allPosts 
-      : allPosts.filter(post => post.platform === platform);
-    
-    renderPosts(filtered);
+    renderPosts(getFilteredPosts());
+    updateLoadMoreButton();
   }
   
-  // Set up event listeners
+  // Event listeners
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       filterPosts(btn.dataset.platform);
     });
   });
+  
+  document.getElementById('load-more-btn').addEventListener('click', loadMore);
   
   // Initialize on page load
   if (document.readyState === 'loading') {
