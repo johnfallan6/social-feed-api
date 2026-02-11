@@ -12,19 +12,21 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
+
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  const INSTAGRAM_USER_ID = process.env.INSTAGRAM_USER_ID;
+  // Use hardcoded Instagram ID for testing
+  const INSTAGRAM_USER_ID = '17841472266241141';
   const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
+
   const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
   const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
 
   // Check cache
   const now = Date.now();
-  if (cache.data && (now - cache.timestamp) < CACHE_DURATION) {
+  if (cache.data && now - cache.timestamp < CACHE_DURATION) {
     return res.status(200).json({
       ...cache.data,
       cached: true,
@@ -67,9 +69,9 @@ module.exports = async function handler(req, res) {
     res.status(200).json(response);
   } catch (error) {
     console.error('Error fetching feed:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to fetch social media feed',
-      message: error.message 
+      message: error.message
     });
   }
 };
@@ -139,7 +141,9 @@ async function fetchInstagramPosts(INSTAGRAM_USER_ID, INSTAGRAM_ACCESS_TOKEN) {
     return data.data.map(item => ({
       id: `instagram_${item.id}`,
       platform: 'instagram',
-      title: item.caption ? (item.caption.substring(0, 100) + (item.caption.length > 100 ? '...' : '')) : 'Instagram Post',
+      title: item.caption
+        ? (item.caption.substring(0, 100) + (item.caption.length > 100 ? '...' : ''))
+        : 'Instagram Post',
       description: item.caption || '',
       thumbnail: item.media_url,
       url: item.permalink,
