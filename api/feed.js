@@ -38,10 +38,10 @@ module.exports = async function handler(req, res) {
     }
 
     // Fetch Instagram posts
-    // if (!platform || platform === 'instagram') {
-    //   const instagramPosts = await fetchInstagramPosts();
-    //   allPosts = allPosts.concat(instagramPosts);
-    // }
+    if (!platform || platform === 'instagram') {
+      const instagramPosts = await fetchInstagramPosts();
+      allPosts = allPosts.concat(instagramPosts);
+    }
 
     // Sort by date (newest first)
     allPosts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
