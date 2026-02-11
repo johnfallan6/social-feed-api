@@ -142,6 +142,8 @@ async function fetchInstagramPosts(INSTAGRAM_USER_ID, INSTAGRAM_ACCESS_TOKEN) {
 
   try {
     console.log('Fetching Instagram posts for ID:', INSTAGRAM_USER_ID);
+    console.log('Force clean rebuild');
+
 
     const igUrl = new URL(`https://graph.instagram.com/${INSTAGRAM_USER_ID}/media`);
     igUrl.search = new URLSearchParams({
