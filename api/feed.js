@@ -1,148 +1,102 @@
-// Vercel Serverless Function - Social Media Feed API
-// Path: /api/feed.js
+import { useState, useEffect } from 'react';
 
-const CACHE_DURATION = 1 * 60 * 1000; // 1 minute cache
-let cache = {
-  data: null,
-  timestamp: 0
-};
+const CACHE_KEY = 'feedCache';
+const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes in ms
+const CACHE_WARNING_DURATION = 5000; // 5 seconds
 
-module.exports = async function handler(req, res) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+export default function Feed() {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [isCached, setIsCached] = useState(false);
 
-  // Serve cached response if still valid
-  const now = Date.now();
-  if (cache.data && now - cache.timestamp < CACHE_DURATION) {
-    return res.status(200).json({
-      ...cache.data,
-      cached: true,
-      cacheAge: Math.floor((now - cache.timestamp) / 1000)
-    });
-  }
+  useEffect(() => {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const { posts, lastUpdated, cachedAt } = JSON.parse(cached);
+      const age = Date.now() - cachedAt;
+      if (age < CACHE_DURATION) {
+        setPosts(posts);
+        setLastUpdated(lastUpdated);
+        setIsCached(true);
 
-  try {
-    const platform = req.query.platform;
-    let allPosts = [];
-
-    // Fetch YouTube posts
-    if (!platform || platform === 'youtube') {
-      const youtubePosts = await fetchYouTubePosts();
-      allPosts = allPosts.concat(youtubePosts);
-    }
-
-    // Fetch Instagram posts
-    if (!platform || platform === 'instagram') {
-      const instagramPosts = await fetchInstagramPosts();
-      allPosts = allPosts.concat(instagramPosts);
-    }
-
-    // Sort posts by newest first
-    allPosts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-    const response = {
-      posts: allPosts,
-      count: allPosts.length,
-      lastUpdated: new Date().toISOString(),
-      cached: false
-    };
-
-    // Update cache
-    cache = { data: response, timestamp: now };
-
-    res.status(200).json(response);
-  } catch (error) {
-    console.error('Error fetching feed:', error);
-    res.status(500).json({
-      error: 'Failed to fetch social media feed',
-      message: error.message
-    });
-  }
-};
-
-// ----------------- Helper Functions -----------------
-
-async function fetchYouTubePosts() {
-  const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
-  const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
-
-  if (!YOUTUBE_API_KEY || !YOUTUBE_CHANNEL_ID) {
-    console.warn('YouTube credentials missing');
-    return [];
-  }
-
-  try {
-    const searchUrl = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${YOUTUBE_CHANNEL_ID}&part=snippet&order=date&maxResults=10&type=video`;
-    const searchRes = await fetch(searchUrl);
-    const searchData = await searchRes.json();
-
-    if (!searchData.items) return [];
-
-    const videoIds = searchData.items.map(i => i.id.videoId).join(',');
-    const statsUrl = `https://www.googleapis.com/youtube/v3/videos?key=${YOUTUBE_API_KEY}&id=${videoIds}&part=statistics`;
-    const statsRes = await fetch(statsUrl);
-    const statsData = await statsRes.json();
-
-    const statsMap = {};
-    statsData.items?.forEach(item => statsMap[item.id] = item.statistics);
-
-    return searchData.items.map(item => ({
-      id: `youtube_${item.id.videoId}`,
-      platform: 'youtube',
-      title: item.snippet.title,
-      description: item.snippet.description,
-      thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url,
-      url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
-      timestamp: item.snippet.publishedAt,
-      metrics: {
-        views: parseInt(statsMap[item.id.videoId]?.viewCount || 0),
-        likes: parseInt(statsMap[item.id.videoId]?.likeCount || 0),
-        comments: parseInt(statsMap[item.id.videoId]?.commentCount || 0)
+        // Auto-hide cached warning after 5s
+        setTimeout(() => setIsCached(false), CACHE_WARNING_DURATION);
+        return;
       }
-    }));
-  } catch (err) {
-    console.error('YouTube API error:', err);
-    return [];
-  }
-}
-
-async function fetchInstagramPosts() {
-  const ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
-  const USER_ID = process.env.INSTAGRAM_USER_ID; // Must be numeric
-
-  if (!ACCESS_TOKEN || !USER_ID) {
-    console.warn('Instagram credentials missing or invalid');
-    return [];
-  }
-
-  try {
-    const url = `https://graph.instagram.com/${USER_ID}/media?fields=id,caption,media_type,media_url,permalink,timestamp&access_token=${ACCESS_TOKEN}&limit=10`;
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!data.data) {
-      console.error('Instagram API returned no data:', data);
-      return [];
     }
+    fetchFeed(); // fetch fresh if no cache or expired
+  }, []);
 
-    return data.data.map(item => ({
-      id: `instagram_${item.id}`,
-      platform: 'instagram',
-      title: item.caption ? item.caption.substring(0, 100) + (item.caption.length > 100 ? '...' : '') : 'Instagram Post',
-      description: item.caption || '',
-      thumbnail: item.media_url,
-      url: item.permalink,
-      timestamp: item.timestamp,
-      mediaType: item.media_type
-    }));
-  } catch (err) {
-    console.error('Instagram API error:', err);
-    return [];
+  async function fetchFeed(hardRefresh = false) {
+    try {
+      setLoading(true);
+      const url = `/api/feed${hardRefresh ? '?hardRefresh=true' : ''}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      setPosts(data.posts);
+      setLastUpdated(data.lastUpdated);
+      setIsCached(false); // fresh fetch is not cached
+
+      // save to localStorage cache
+      localStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({
+          posts: data.posts,
+          lastUpdated: data.lastUpdated,
+          cachedAt: Date.now(),
+        })
+      );
+    } catch (err) {
+      console.error('Failed to fetch feed:', err);
+    } finally {
+      setLoading(false);
+    }
   }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold">Feed</h2>
+        <button
+          onClick={() => fetchFeed(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          disabled={loading}
+        >
+          {loading ? 'Refreshing...' : 'Refresh Feed'}
+        </button>
+      </div>
+
+      <p className="text-sm text-gray-500 mb-1">
+        Last Updated: {lastUpdated ? new Date(lastUpdated).toLocaleString() : '—'}
+      </p>
+      {isCached && (
+        <p className="text-xs text-yellow-600 mb-2 transition-opacity duration-500">
+          ⚠️ Showing cached data. Click "Refresh Feed" for live updates.
+        </p>
+      )}
+
+      <div className="grid gap-4">
+        {posts.map(post => (
+          <div key={post.id} className="border rounded p-2">
+            <a href={post.url} target="_blank" rel="noopener noreferrer">
+              <img
+                src={post.thumbnail}
+                alt={post.title}
+                className="w-full h-auto rounded mb-2"
+              />
+              <h3 className="font-semibold">{post.title}</h3>
+            </a>
+            {post.metrics && (
+              <div className="text-sm text-gray-600 mt-1">
+                {post.metrics.views !== null && <>Views: {post.metrics.views} </>}
+                {post.metrics.likes !== null && <>Likes: {post.metrics.likes} </>}
+                {post.metrics.comments !== null && <>Comments: {post.metrics.comments}</>}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
