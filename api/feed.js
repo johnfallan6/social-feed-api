@@ -1,7 +1,7 @@
 // Vercel Serverless Function - Social Media Feed API
 // Path: /api/feed.js
 
-const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
+const CACHE_DURATION = 1 * 60 * 1000; // 1 minute
 let cache = { data: null, timestamp: 0 };
 
 module.exports = async function handler(req, res) {
@@ -18,11 +18,22 @@ module.exports = async function handler(req, res) {
   const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
   const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
 
-  if (!INSTAGRAM_USER_ID || !INSTAGRAM_ACCESS_TOKEN) {
-    console.warn('Instagram credentials not configured');
-  }
-  if (!YOUTUBE_API_KEY || !YOUTUBE_CHANNEL_ID) {
-    console.warn('YouTube credentials not configured');
+  // --- Runtime validation ---
+  console.log('ENV CHECK:');
+  console.log('INSTAGRAM_USER_ID =', INSTAGRAM_USER_ID);
+  console.log('INSTAGRAM_ACCESS_TOKEN =', INSTAGRAM_ACCESS_TOKEN ? 'set' : 'unset');
+  console.log('YOUTUBE_API_KEY =', YOUTUBE_API_KEY ? 'set' : 'unset');
+  console.log('YOUTUBE_CHANNEL_ID =', YOUTUBE_CHANNEL_ID ? 'set' : 'unset');
+
+  if (!INSTAGRAM_USER_ID || INSTAGRAM_USER_ID === 'inspiringaccess') {
+    console.error(
+      "ERROR: INSTAGRAM_USER_ID is not set or still using 'inspiringaccess'. " +
+      "Please use the numeric Instagram ID."
+    );
+    return res.status(500).json({
+      error: "Instagram User ID misconfigured",
+      message: "INSTAGRAM_USER_ID is missing or invalid. Must be numeric, not username."
+    });
   }
 
   // Serve from cache if still fresh
@@ -130,7 +141,7 @@ async function fetchInstagramPosts(INSTAGRAM_USER_ID, INSTAGRAM_ACCESS_TOKEN) {
   if (!INSTAGRAM_USER_ID || !INSTAGRAM_ACCESS_TOKEN) return [];
 
   try {
-    console.log('Using Instagram ID:', INSTAGRAM_USER_ID);
+    console.log('Fetching Instagram posts for ID:', INSTAGRAM_USER_ID);
 
     const igUrl = new URL(`https://graph.instagram.com/${INSTAGRAM_USER_ID}/media`);
     igUrl.search = new URLSearchParams({
