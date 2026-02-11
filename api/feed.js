@@ -1,7 +1,7 @@
 // Vercel Serverless Function - Social Media Feed API
 // Path: /api/feed.js
 
-const CACHE_DURATION = 1 * 60 * 1000; // 1 minute
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
 let cache = { data: null, timestamp: 0 };
 
 module.exports = async function handler(req, res) {
