@@ -1,4 +1,4 @@
-const CACHE_DURATION = 15 * 60 * 1000;
+const CACHE_DURATION = 10 * 60 * 1000;
 let cache = { data: null, timestamp: 0 };
 
 module.exports = async function handler(req, res) {
