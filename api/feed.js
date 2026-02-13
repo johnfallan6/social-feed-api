@@ -51,7 +51,7 @@ async function fetchYouTube() {
 
   try {
     // Get video list
-    const searchUrl = `https://www.googleapis.com/youtube/v3/search?key=${key}&channelId=${channel}&part=snippet&order=date&maxResults=10&type=video`;
+    const searchUrl = `https://www.googleapis.com/youtube/v3/search?key=${key}&channelId=${channel}&part=snippet&order=date&maxResults=12&type=video`;
     const searchRes = await fetch(searchUrl);
     const searchData = await searchRes.json();
 
@@ -100,7 +100,7 @@ async function fetchInstagram() {
   }
 
   try {
-    const url = `https://graph.instagram.com/${user}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count&access_token=${token}&limit=10`;
+    const url = `https://graph.instagram.com/${user}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count&access_token=${token}&limit=12`;
     const res = await fetch(url);
     const data = await res.json();
 
